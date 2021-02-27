@@ -171,14 +171,6 @@ generic_function = Sequence(
         (:function, name)
     end
 
-ambi_delimiter = Either(split(raw"""
-    | \| / \backslash \uparrow \downarrow \updownarrow \Uparrow
-    \Downarrow \Updownarrow . \vert \Vert \\|""")...)
-
-left_delimiter = Either(split(raw"( [ \{ < \lfloor \langle \lceil")...)
-
-right_delimiter = Either(split(raw") ] \} > \rfloor \rangle \rceil")...)
-
 space_widths = Dict(
     raw"\,"         => 0.16667,   # 3/18 em = 3 mu
     raw"\thinspace" => 0.16667,   # 3/18 em = 3 mu
@@ -198,6 +190,36 @@ space = Either(to_token.(keys(space_widths))...) do s
     (:space, space_widths[s])
 end
 
+
+# Main parser
+# TODO Fractions
+# TODO Error if the string is not match entirely
+# TODO Add generic command for symbols
+mathexpr = Repeat(Either(
+    decorated, spaced_symbol, punctuation, overunder, integral, space, atom)) do res
+    (:expr, res...)
+end
+
+# Recursive bracket
+group = Sequence(2, '{', mathexpr, '}') do expr
+    (:group, expr[2:end]...)  # Get rid of the :expr header
+end
+
+# Recursive autodelim
+ambi_delimiter = Either(split(raw"""
+    | \| / \backslash \uparrow \downarrow \updownarrow \Uparrow
+    \Downarrow \Updownarrow . \vert \Vert \\|""")...)
+
+left_delimiter = Either(split(raw"( [ \{ < \lfloor \langle \lceil")...)
+
+right_delimiter = Either(split(raw") ] \} > \rfloor \rangle \rceil")...)
+
+delimiter = sEither(ambi_delimiter, left_delimiter, right_delimiter)
+delimited = Sequence(raw"\left", delimiter, mathexpr, raw"\right", delimiter) do res
+    (:delimited, res[2], res[3], res[5])
+end
+
+# Commands that requires a braced group as an argument
 narrow_accent_map = Dict(
     raw"hat"            => raw"\circumflexaccent",
     raw"breve"          => raw"\combiningbreve",
@@ -219,38 +241,23 @@ narrow_accent_map = Dict(
     raw"mathring"       => raw"\circ",
 )
 
-
-# TODO add accent and fonts
-narrow_accent = Either(keys(narrow_accent_map)...)
-wide_accent = Either(split(raw"widehat widetilde widebar")...)
+narrow_accent = Sequence(bslash, Either(keys(narrow_accent_map)...), group) do (_, acc, content)
+    (:accent, acc, content)
+end
+wide_accent = Sequence(bslash, Either(split(raw"widehat widetilde widebar")...), group) do (_, acc, content)
+    (:wide_accent, acc, content)
+end
 
 fontnames = split(raw"rm cal it tt sf bf default bb frak scr regular")
-font = Either(fontnames...)
-latexfont = Either(("math" .* fontnames)...)
-
-
-# Main parser
-# TODO Fractions
-# TODO Error if the string is not match entirely
-# TODO Add generic command for symbols
-# TODO Command that require a following groupe in brace
-mathexpr = Repeat(Either(
-    decorated, spaced_symbol, punctuation, overunder, integral, space, atom)) do res
-    (:expr, res...)
-end
-
-# Recursive bracket
-group = Sequence(2, '{', mathexpr, '}') do expr
-    (:group, expr[2:end]...)  # Get rid of the :expr header
-end
-
-delimiter = sEither(ambi_delimiter, left_delimiter, right_delimiter)
-delimited = Sequence(raw"\left", delimiter, mathexpr, raw"\right", delimiter) do res
-    (:delimited, res[2], res[3], res[5])
+mathfont = Sequence(bslash, "math", Either(fontnames...), group) do (_, _, name, content)
+    (:mathfont, name, content)
 end
 
 # Add everything needed to atom
 push!(atom, generic_function)
+pushfirst!(atom, narrow_accent)
+pushfirst!(atom, wide_accent)
+pushfirst!(atom, mathfont)
 pushfirst!(atom, group)
 pushfirst!(atom, delimited)
 

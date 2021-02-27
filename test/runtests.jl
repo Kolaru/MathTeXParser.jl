@@ -1,8 +1,14 @@
 using Test
 using MathTeXParser
 
+@testset "Accent" begin
+    @test parse(TeXExpr, raw"\vec{a}") == TeXExpr((:expr, (:accent, "vec", (:group, 'a'))))
+    @test parse(TeXExpr, raw"\dot{\vec{x}}") == TeXExpr(
+        (:expr, (:accent, "dot", (:group, (:accent, "vec", (:group, 'x'))))))
+end
+
 @testset "Decoration" begin
-    @test parse(TeXExpr, "a^2_3") == parse(TeXExpr, "a_3^2")
+    @test parse(TeXExpr, raw"a^2_3") == parse(TeXExpr, "a_3^2")
 end
 
 @testset "Command match full words" begin
