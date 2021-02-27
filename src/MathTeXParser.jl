@@ -48,11 +48,27 @@ function Base.:(==)(tex1::TeXExpr, tex2::TeXExpr)
 end
 
 # Everything is wrapped into TeXExpr after the initial parsing to tuple
-# to avoid blocking inference errors from CombinedParsers.jl
+# to avoid inference errors from CombinedParsers.jl
 Base.parse(::Type{TeXExpr}, s) = TeXExpr(parse(mathexpr, s))
 
 # Definition is forwarded to allow recursive search
 atom = Either{Any}(Numeric(Int), CharNotIn(raw"\%_^{}"))  # Called `placeable` in matplotlib
+
+command_char = CharIn(union('a':'z'), ('A':'Z'))
+
+"""
+    to_token(s)
+
+Transform a string into a parser that match it as a token. For single char
+string this does nothing, but for longer string it look forward to make sure
+it only matches full words.
+"""
+function to_token(s)
+    length(s) == 1 && return s
+    return Sequence(2, NegativeLookahead(Sequence(s, command_char)), s)
+end
+
+split_tokens(s) = to_token.(split(s))
 
 # Super and subscript
 superscript = Sequence(2, '^', atom)
@@ -77,7 +93,7 @@ end
 
 bslash = '\\'
 
-binary_operator = Either(split(raw"""
+binary_operator = Either(split_tokens(raw"""
     + * -
     \pm             \sqcap                   \rhd
     \mp             \sqcup                   \unlhd
@@ -92,7 +108,7 @@ binary_operator = Either(split(raw"""
     \cup            \triangleright           \ddagger
     \uplus          \lhd                     \amalg""")...)
 
-relation = Either(split(raw"""
+relation = Either(split_tokens(raw"""
     = < > :
     \leq        \geq        \equiv   \models
     \prec       \succ       \sim     \perp
@@ -105,7 +121,7 @@ relation = Either(split(raw"""
     \in         \ni         \propto  \vdash
     \dashv      \dots       \dotplus \doteqdot""")...)
 
-arrow = Either(split(raw"""
+arrow = Either(split_tokens(raw"""
     \leftarrow              \longleftarrow           \uparrow
     \Leftarrow              \Longleftarrow           \Uparrow
     \rightarrow             \longrightarrow          \downarrow
@@ -122,16 +138,16 @@ spaced_symbol = sEither(binary_operator, relation, arrow) do x
     (:spaced_symbol, x)
 end
 
-punctuation = Either(split(raw", ; . ! \ldotp \cdotp")...) do x
+punctuation = Either(split_tokens(raw", ; . ! \ldotp \cdotp")...) do x
     (:punctuation, x)
 end
 
-overunder_symbol = Either(split(raw"""
+overunder_symbol = Either(split_tokens(raw"""
     \sum \prod \coprod \bigcap \bigcup \bigsqcup \bigvee
     \bigwedge \bigodot \bigotimes \bigoplus \biguplus""")...)
 
 overunder_function = Sequence(
-    2, bslash, Either(split(raw"lim liminf limsup sup max min")...)) do name
+    2, bslash, Either(split_tokens(raw"lim liminf limsup sup max min")...)) do name
     (:function, name)
 end
 
@@ -141,14 +157,14 @@ overunder = Sequence(
         dec === missing ? core : (:overunder, core, (:super, dec[2]), (:sub, dec[3]))
     end
 
-integral_symbol = Either(split(raw"\int \oint")...)
+integral_symbol = Either(split_tokens(raw"\int \oint")...)
 
 integral = Sequence(integral_symbol, Optional(decoration)) do (core, dec)
     dec === missing ? core : (:integral, core, (:super, dec[2]), (:sub, dec[3]))
 end
 
 generic_function = Sequence(
-    2, bslash, Either(split(raw"""
+    2, bslash, Either(split_tokens(raw"""
     arccos csc ker min arcsin deg lg Pr arctan det lim sec arg dim
     liminf sin cos exp limsup sinh cosh gcd ln sup cot hom log tan
     coth inf max tanh""")...)) do name
@@ -178,7 +194,7 @@ space_widths = Dict(
     raw"\!"         => -0.16667,  # -3/18 em = -3 mu
 )
 
-space = Either(keys(space_widths)...) do s
+space = Either(to_token.(keys(space_widths))...) do s
     (:space, space_widths[s])
 end
 
@@ -214,10 +230,10 @@ latexfont = Either(("math" .* fontnames)...)
 
 
 # Main parser
-# TODO Only match command if followed by a separator
 # TODO Fractions
 # TODO Error if the string is not match entirely
 # TODO Add generic command for symbols
+# TODO Command that require a following groupe in brace
 mathexpr = Repeat(Either(
     decorated, spaced_symbol, punctuation, overunder, integral, space, atom)) do res
     (:expr, res...)
