@@ -1,4 +1,4 @@
-module LaTeXParser
+module MathTeXParser
 # Adapted from Matplotlib mathtext grammar definition
 # https://github.com/matplotlib/matplotlib/blob/master/lib/matplotlib/_mathtext.py
 
@@ -7,9 +7,9 @@ using CombinedParsers
 
 export TeXExpr, parse
 
-struct TeXExpr
+struct TeXExpr{T <: Tuple}
     head::Symbol
-    args::Tuple
+    args::T
 end
 
 TeXExpr(head, args...) = TeXExpr(head, args)
@@ -22,6 +22,7 @@ function TeXExpr(tuple::Tuple)
         if isa(arg, Tuple)
             push!(args, TeXExpr(arg))
         else
+            # Ignore all spaces, this could probably be done elsewhere
             if arg != ' '
                 push!(args, arg)
             end
@@ -36,6 +37,18 @@ AbstractTrees.children(texexpr::TeXExpr) = texexpr.args
 AbstractTrees.printnode(io::IO, texexpr::TeXExpr) = print(io, "$(texexpr.head)")
 
 Base.show(io::IO, texexpr::TeXExpr) = print_tree(io, texexpr, 10)
+
+function Base.:(==)(tex1::TeXExpr, tex2::TeXExpr)
+    childs1 = children(tex1)
+    childs2 = children(tex2)
+    
+    length(childs1) != length(childs2) && return false
+
+    return all(childs1 .== childs2)
+end
+
+# Everything is wrapped into TeXExpr after the initial parsing to tuple
+# to avoid blocking inference errors from CombinedParsers.jl
 Base.parse(::Type{TeXExpr}, s) = TeXExpr(parse(mathexpr, s))
 
 # Definition is forwarded to allow recursive search

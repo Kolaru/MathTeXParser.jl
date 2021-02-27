@@ -1,5 +1,5 @@
 name = "MathTeXParser"
-uuid = "f144c793-b2eb-46c3-9d22-b25cb8794f6e"
+uuid = "d08e7298-fb8b-4c6b-ba88-765b5fdb5f1b"
 authors = ["Benoît Richard <kolaru@hotmail.com>"]
 version = "0.1.0"
 
@@ -7,3 +7,4 @@ version = "0.1.0"
 AbstractTrees = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 CombinedParsers = "5ae71ed2-6f8a-4ed1-b94f-e14e8158f19e"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
