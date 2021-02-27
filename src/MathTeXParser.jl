@@ -202,7 +202,13 @@ end
 
 # Recursive bracket
 group = Sequence(2, '{', mathexpr, '}') do expr
-    (:group, expr[2:end]...)  # Get rid of the :expr header
+    args = expr[2:end]  # Get rid of the :expr header
+
+    if length(args) == 1
+        return args[1]  # Skip the group level if it contains a single element
+    else
+        (:group, args...)
+    end
 end
 
 # Recursive autodelim

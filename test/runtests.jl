@@ -2,9 +2,8 @@ using Test
 using MathTeXParser
 
 @testset "Accent" begin
-    @test parse(TeXExpr, raw"\vec{a}") == TeXExpr((:expr, (:accent, "vec", (:group, 'a'))))
-    @test parse(TeXExpr, raw"\dot{\vec{x}}") == TeXExpr(
-        (:expr, (:accent, "dot", (:group, (:accent, "vec", (:group, 'x'))))))
+    @test parse(TeXExpr, raw"\vec{a}") == TeXExpr((:expr, (:accent, "vec", 'a')))
+    @test parse(TeXExpr, raw"\dot{\vec{x}}") == TeXExpr((:expr, (:accent, "dot", (:accent, "vec", 'x'))))
 end
 
 @testset "Decoration" begin
@@ -16,5 +15,5 @@ end
     @test parse(TeXExpr, raw"\int") == TeXExpr((:expr, raw"\int"))
 
     # Check braces are not added to the function name
-    @test parse(TeXExpr, raw"\sin{x}") == TeXExpr((:expr, (:function, "sin"), (:group, 'x')))
+    @test parse(TeXExpr, raw"\sin{x}") == TeXExpr((:expr, (:function, "sin"), 'x'))
 end
