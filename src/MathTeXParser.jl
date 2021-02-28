@@ -77,16 +77,16 @@ split_tokens(s) = to_token.(split(s))
 superscript = Sequence(2, '^', atom)
 subscript = Sequence(2, '_', atom)
 
-# Always return the decoration in order (super, sub)
+# Always return the decoration in order (sub, super)
 decoration = Either(
-    Sequence(superscript, subscript) do (x, y)
-        (:supersub, x, y)
+    Sequence(subscript, superscript) do (x, y)
+        (:subsuper, x, y)
     end,
-    Sequence(subscript, Optional(superscript, default="")) do (x, y)
-        (:supersub, y, x)
+    Sequence(superscript, Optional(subscript, default="")) do (x, y)
+        (:subsuper, y, x)
     end,
-    Sequence(1, superscript) do x
-        (:supersub, x, "")
+    Sequence(1, subscript) do x
+        (:subsuper, x, "")
     end
 )
 
@@ -145,12 +145,14 @@ end
 
 overunder_symbol = Either(split_tokens(raw"""
     \sum \prod \coprod \bigcap \bigcup \bigsqcup \bigvee
-    \bigwedge \bigodot \bigotimes \bigoplus \biguplus""")...)
+    \bigwedge \bigodot \bigotimes \bigoplus \biguplus""")...) do sym
+        (:symbol, sym)
+    end
 
 overunder_function = Sequence(
     2, bslash, Either(split_tokens(raw"lim liminf limsup sup max min")...)) do name
-    (:function, name)
-end
+        (:function, name)
+    end
 
 overunder = Sequence(
     sEither(overunder_symbol, overunder_function),
@@ -158,10 +160,12 @@ overunder = Sequence(
         dec === missing ? core : (:overunder, core, (:super, dec[2]), (:sub, dec[3]))
     end
 
-integral_symbol = Either(split_tokens(raw"\int \oint")...)
+integral_symbol = Either(split_tokens(raw"\int \oint")...) do sym
+    (:symbol, sym)
+end
 
 integral = Sequence(integral_symbol, Optional(decoration)) do (core, dec)
-    dec === missing ? core : (:integral, core, (:super, dec[2]), (:sub, dec[3]))
+    dec === missing ? core : (:integral, core, (:sub, dec[2]), (:super, dec[3]))
 end
 
 func = Sequence(
@@ -194,7 +198,7 @@ end
 
 ## Main parser
 mathexpr = Repeat(Either(
-    decorated, spaced_symbol, punctuation, overunder, integral, space, atom)) do res
+    integral, overunder, decorated, spaced_symbol, punctuation, space, atom)) do res
     (:expr, res...)
 end
 
@@ -248,10 +252,10 @@ narrow_accent_map = Dict(
 )
 
 narrow_accent = Sequence(bslash, Either(keys(narrow_accent_map)...), group) do (_, acc, content)
-    (:accent, acc, content)
+    (:accent, bslash * acc, content)
 end
 wide_accent = Sequence(bslash, Either(split(raw"widehat widetilde widebar")...), group) do (_, acc, content)
-    (:wide_accent, acc, content)
+    (:wide_accent, bslash * acc, content)
 end
 
 fontnames = split(raw"rm cal it tt sf bf default bb frak scr regular")
@@ -276,7 +280,7 @@ pushfirst!(atom, delimited)
 ## Default for generic latex commands
 # We assume anything that starts with \ and has not been catch is a symbol
 symbol = Sequence(2, bslash, Repeat(command_char)) do chars
-    (:symbol, join(chars))
+    (:symbol, bslash * join(chars))
 end
 
 # Make sure to add it at the very end to avoid matching known commands as a
