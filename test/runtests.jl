@@ -1,16 +1,11 @@
 using Test
 using MathTeXParser
 
-"""
-Utils for easier manual building of TeXExpr.
-
-Allow to skip the first :expr header and one level of nestedness.
-"""
-expr(args...) = TeXExpr((:expr, args...))
+test_parse(input, args...) = @test parse(TeXExpr, input) == TeXExpr((:expr, args...))
 
 @testset "Accent" begin
-    @test parse(TeXExpr, raw"\vec{a}") == expr((:accent, raw"\vec", 'a'),)
-    @test parse(TeXExpr, raw"\dot{\vec{x}}") == expr((:accent, raw"\dot", (:accent, raw"\vec", 'x')),)
+    test_parse(raw"\vec{a}", (:accent, raw"\vec", 'a'))
+    test_parse(raw"\dot{\vec{x}}", (:accent, raw"\dot", (:accent, raw"\vec", 'x')))
 end
 
 @testset "Decoration" begin
@@ -19,31 +14,31 @@ end
 
 @testset "Command match full words" begin
     # Check braces are not added to the function name
-    @test parse(TeXExpr, raw"\sin{x}") == expr((:function, "sin"), 'x')
+    test_parse(raw"\sin{x}", (:function, "sin"), 'x')
 end
 
 @testset "Fraction" begin
-    @test parse(TeXExpr, raw"\frac{1}{2}") == expr((:frac, 1, 2),)
+    test_parse(raw"\frac{1}{2}", (:frac, 1, 2))
 end
 
 @testset "Integral" begin
-    @test parse(TeXExpr, raw"\int") == expr((:symbol, raw"\int"),)
-    @test parse(TeXExpr, raw"\int_a^b") == expr(
-        (:overunder, (:symbol, raw"\int"),
-            (:sub, 'a'),
-            (:super, 'b')),)
+    test_parse(raw"\int", (:symbol, raw"\int"))
+    test_parse(raw"\int_a^b", (:overunder,
+        (:symbol, raw"\int"),
+        (:sub, 'a'),
+        (:super, 'b')))
 end
 
 @testset "Overunder" begin
-    @test parse(TeXExpr, raw"\sum") == expr((:symbol, raw"\sum"),)
-    @test parse(TeXExpr, raw"\sum_{k=0}^n") == expr(
-        (:overunder, (:symbol, raw"\sum"),
-            (:sub, (:group, 'k', (:spaced_symbol, "="), 0)),
-            (:super, 'n')),)
+    test_parse(raw"\sum", (:symbol, raw"\sum"))
+    test_parse(raw"\sum_{k=0}^n", (:overunder,
+        (:symbol, raw"\sum"),
+        (:sub, (:group, 'k', (:spaced_symbol, "="), 0)),
+        (:super, 'n')))
 end
 
 @testset "Symbol" begin
     for sym in split(raw"\phi \varphi \Phi")
-        @test parse(TeXExpr, sym) == expr((:symbol, sym),)
+        test_parse(sym, (:symbol, sym))
     end
 end
