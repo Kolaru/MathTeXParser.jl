@@ -49,7 +49,10 @@ end
 
 # Everything is wrapped into TeXExpr after the initial parsing to tuple
 # to avoid inference errors from CombinedParsers.jl
-Base.parse(::Type{TeXExpr}, s) = TeXExpr(parse(mathexpr, s))
+# TODO better error
+Base.parse(::Type{TeXExpr}, s) = TeXExpr(parse(Sequence(1, mathexpr, AtEnd()), s))
+
+bslash = '\\'
 
 # Definition is forwarded to allow recursive search
 atom = Either{Any}(Numeric(Int), CharNotIn(raw"\%_^{}"))  # Called `placeable` in matplotlib
@@ -90,8 +93,6 @@ decoration = Either(
 decorated = Sequence(atom, decoration) do (core, dec)
     (:decorated, core, (:super, dec[2]), (:sub, dec[3]))
 end
-
-bslash = '\\'
 
 binary_operator = Either(split_tokens(raw"""
     + * -
@@ -163,7 +164,7 @@ integral = Sequence(integral_symbol, Optional(decoration)) do (core, dec)
     dec === missing ? core : (:integral, core, (:super, dec[2]), (:sub, dec[3]))
 end
 
-generic_function = Sequence(
+func = Sequence(
     2, bslash, Either(split_tokens(raw"""
     arccos csc ker min arcsin deg lg Pr arctan det lim sec arg dim
     liminf sin cos exp limsup sinh cosh gcd ln sup cot hom log tan
@@ -191,16 +192,15 @@ space = Either(to_token.(keys(space_widths))...) do s
 end
 
 
-# Main parser
-# TODO Fractions
-# TODO Error if the string is not match entirely
-# TODO Add generic command for symbols
+## Main parser
 mathexpr = Repeat(Either(
     decorated, spaced_symbol, punctuation, overunder, integral, space, atom)) do res
     (:expr, res...)
 end
 
-# Recursive bracket
+
+## Recursive definition that uses mathexpr parser as one of their elements
+# Expression grouped by braces
 group = Sequence(2, '{', mathexpr, '}') do expr
     args = expr[2:end]  # Get rid of the :expr header
 
@@ -211,7 +211,7 @@ group = Sequence(2, '{', mathexpr, '}') do expr
     end
 end
 
-# Recursive autodelim
+# Autodelim
 ambi_delimiter = Either(split(raw"""
     | \| / \backslash \uparrow \downarrow \updownarrow \Uparrow
     \Downarrow \Updownarrow . \vert \Vert \\|""")...)
@@ -225,7 +225,7 @@ delimited = Sequence(raw"\left", delimiter, mathexpr, raw"\right", delimiter) do
     (:delimited, res[2], res[3], res[5])
 end
 
-# Commands that requires a braced group as an argument
+## Commands using a braced group as an argument
 narrow_accent_map = Dict(
     raw"hat"            => raw"\circumflexaccent",
     raw"breve"          => raw"\combiningbreve",
@@ -259,12 +259,28 @@ mathfont = Sequence(bslash, "math", Either(fontnames...), group) do (_, _, name,
     (:mathfont, name, content)
 end
 
+frac = Sequence(raw"\frac", group, group) do (_, num, denum)
+    (:frac, num, denum)
+end
+
 # Add everything needed to atom
-push!(atom, generic_function)
+push!(atom, func)
 pushfirst!(atom, narrow_accent)
 pushfirst!(atom, wide_accent)
 pushfirst!(atom, mathfont)
+pushfirst!(atom, frac)
 pushfirst!(atom, group)
 pushfirst!(atom, delimited)
+
+
+## Default for generic latex commands
+# We assume anything that starts with \ and has not been catch is a symbol
+symbol = Sequence(2, bslash, Repeat(command_char)) do chars
+    (:symbol, join(chars))
+end
+
+# Make sure to add it at the very end to avoid matching known commands as a
+# generic symbol
+push!(atom, symbol)
 
 end # module
