@@ -168,6 +168,7 @@ integral = Sequence(integral_symbol, Optional(decoration)) do (core, dec)
     dec === missing ? core : (:integral, core, (:sub, dec[2]), (:super, dec[3]))
 end
 
+# TODO Why are some function both here and in overunder ?
 func = Sequence(
     2, bslash, Either(split_tokens(raw"""
     arccos csc ker min arcsin deg lg Pr arctan det lim sec arg dim
