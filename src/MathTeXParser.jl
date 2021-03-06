@@ -91,7 +91,7 @@ decoration = Either(
 )
 
 decorated = Sequence(atom, decoration) do (core, dec)
-    (:decorated, core, (:super, dec[2]), (:sub, dec[3]))
+    (:decorated, core, dec[2], dec[3])
 end
 
 binary_operator = Either(split_tokens(raw"""
@@ -154,10 +154,10 @@ overunder_function = Sequence(
         (:function, name)
     end
 
-overunder = Sequence(
+underover = Sequence(
     sEither(overunder_symbol, overunder_function),
     Optional(decoration)) do (core, dec)
-        dec === missing ? core : (:overunder, core, (:super, dec[2]), (:sub, dec[3]))
+        dec === missing ? core : (:underover, core, dec[2], dec[3])
     end
 
 integral_symbol = Either(split_tokens(raw"\int \oint")...) do sym
@@ -165,10 +165,10 @@ integral_symbol = Either(split_tokens(raw"\int \oint")...) do sym
 end
 
 integral = Sequence(integral_symbol, Optional(decoration)) do (core, dec)
-    dec === missing ? core : (:integral, core, (:sub, dec[2]), (:super, dec[3]))
+    dec === missing ? core : (:integral, core, dec[2], dec[3])
 end
 
-# TODO Why are some function both here and in overunder ?
+# TODO Why are some function both here and in underover ?
 func = Sequence(
     2, bslash, Either(split_tokens(raw"""
     arccos csc ker min arcsin deg lg Pr arctan det lim sec arg dim
@@ -199,15 +199,15 @@ end
 
 ## Main parser
 mathexpr = Repeat(Either(
-    integral, overunder, decorated, spaced_symbol, punctuation, space, atom)) do res
-    (:expr, res...)
+    integral, underover, decorated, spaced_symbol, punctuation, space, atom)) do res
+    (:group, res...)
 end
 
 
 ## Recursive definition that uses mathexpr parser as one of their elements
 # Expression grouped by braces
 group = Sequence(2, '{', mathexpr, '}') do expr
-    args = expr[2:end]  # Get rid of the :expr header
+    args = expr[2:end]  # Get rid of the :group header
 
     if length(args) == 1
         return args[1]  # Skip the group level if it contains a single element

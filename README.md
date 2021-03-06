@@ -10,43 +10,40 @@ This works is based on `mathtext`, matplotlib LaTeX engine.
 
 # Currently supported
 
-- Subscript and superscript (wrapped in `:decorated` expression)
-- Spaced symbols (binary symbols, relational symbols and arrows)
-- Punctuation (I don't think they are treated differently from other symbols in math mode though)
-- Symbols and function with decoration over and/or under them (sum, integral, limits and the like)
-- Named functions (like sin)
-- Fixed space commands (the `\quad` family)
-- Nested groups with braces
-- Nested groups with automatically sized delimiters
-- Narrow and wide accents
-- Mathematical font commands
-- Fraction
-- Generic symbol (currently any command not recognized as one of the above fallback to this)
+- `(:decorated, core, subscript, superscript)` Elements "decorated" with subscript and superscript
+- `(:spaced_symbol, symbol)` Spaced symbols (binary symbols, relational symbols and arrows)
+- `(:punctuation, symbol)` Punctuation (I don't think they are treated differently from other symbols in math mode though)
+- `(:underover, symbol, under, over)` Symbols or function with decoration over and/or under them (sum, limits and the like, except integral)
+- `(:integral, symbol, under, over)` Integrals (no idea why it is parsed separately by matplotlib)
+- `(:function, name)` Named functions (like `sin`)
+- `(:space, width)` Fixed space commands (the `\quad` family)
+- `(:group, elements...)` Groups defined with braces, possibly nested
+- `(:delimited, left_delimiter, content, right_delimiter)` Groups with automatically sized delimiters
+- `(:accent, symbol, core)` and `(:wide_accent, symbol, core)` Narrow and wide accents
+- `(:mathfont, fontstyle, content)` Mathematical font commands (`\mathbb` and the like). `fontstyle` omits the starting `\math` (e.g. it is `bb` for a `\mathbb` command).
+- `(:frac, numerator, denumerator)` Fraction
+- `(:symbol, symbol_command)` Generic symbol (currently any command not recognized as one of the above fallback to this)
 
 # Example
 
 ```julia
 julia> parse(TeXExpr, raw"\sum^{a_2}_{b + 2} \left[ x + y \right] \Rightarrow \sin^2 x_k")
-expr
+group
 ├─ overunder
-│  ├─ "\\sum"
-│  ├─ super
-│  │  └─ group
-│  │     └─ decorated
-│  │        ├─ 'a'
-│  │        ├─ super
-│  │        │  └─ ""
-│  │        └─ sub
-│  │           └─ 2
-│  └─ sub
-│     └─ group
-│        ├─ 'b'
-│        ├─ spaced_symbol
-│        │  └─ "+"
-│        └─ 2
+│  ├─ symbol
+│  │  └─ "\\sum"
+│  ├─ group
+│  │  ├─ 'b'
+│  │  ├─ spaced_symbol
+│  │  │  └─ "+"
+│  │  └─ 2
+│  └─ decorated
+│     ├─ 'a'
+│     ├─ 2
+│     └─ ""
 ├─ delimited
 │  ├─ "["
-│  ├─ expr
+│  ├─ group
 │  │  ├─ 'x'
 │  │  ├─ spaced_symbol
 │  │  │  └─ "+"
@@ -57,14 +54,10 @@ expr
 ├─ decorated
 │  ├─ function
 │  │  └─ "sin"
-│  ├─ super
-│  │  └─ 2
-│  └─ sub
-│     └─ ""
+│  ├─ ""
+│  └─ 2
 └─ decorated
    ├─ 'x'
-   ├─ super
-   │  └─ ""
-   └─ sub
-      └─ 'k'
+   ├─ 'k'
+   └─ ""
 ```

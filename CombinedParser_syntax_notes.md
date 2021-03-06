@@ -1,8 +1,0 @@
-- `sEither`, `sSequence` : simplify automatically if the arguments allow it. Alternatively use `union` and `cat` function to combine `Either` and `Sequence`.
-- Overall better documentation for recursive parsers.
-- Unclear `for` syntax in `@syntax` (rational example).
-- Allow `Delayed` definition i.e. empty `Either` with possibility to define content with a single command e.g. `define!` instead of multiple `push!`.
-- `@with_names` fails with anything that is not a parser.
-- Is it possible to deactivate inference? It causes me troubles when using transform that return custom types.
-- `Sequence(rec, rec)` where `rec` is a recursive pattern seem to stackoverflow
-- Unhelpful error when using `Either` with single argument

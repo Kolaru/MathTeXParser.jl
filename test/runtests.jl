@@ -1,7 +1,7 @@
 using Test
 using MathTeXParser
 
-test_parse(input, args...) = @test parse(TeXExpr, input) == TeXExpr((:expr, args...))
+test_parse(input, args...) = @test parse(TeXExpr, input) == TeXExpr((:group, args...))
 
 @testset "Accent" begin
     test_parse(raw"\vec{a}", (:accent, raw"\vec", 'a'))
@@ -24,17 +24,15 @@ end
 @testset "Integral" begin
     test_parse(raw"\int", (:symbol, raw"\int"))
     test_parse(raw"\int_a^b", (:overunder,
-        (:symbol, raw"\int"),
-        (:sub, 'a'),
-        (:super, 'b')))
+        (:symbol, raw"\int"), 'a', 'b'))
 end
 
 @testset "Overunder" begin
     test_parse(raw"\sum", (:symbol, raw"\sum"))
     test_parse(raw"\sum_{k=0}^n", (:overunder,
         (:symbol, raw"\sum"),
-        (:sub, (:group, 'k', (:spaced_symbol, "="), 0)),
-        (:super, 'n')))
+        (:group, 'k', (:spaced_symbol, "="), 0),
+        'n'))
 end
 
 @testset "Symbol" begin
