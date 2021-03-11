@@ -4,6 +4,11 @@ module MathTeXParser
 
 using AbstractTrees
 using CombinedParsers
+import REPL.REPLCompletions: latex_symbols
+import REPL: symbols_latex, symbol_latex
+
+# Force REPLCompletions to populate symbols_latex
+symbol_latex("")
 
 export TeXExpr, parse
 
@@ -71,6 +76,31 @@ end
 
 split_tokens(s) = to_token.(split(s))
 
+"""
+    any_symbol(s::String)
+
+Construct an `Either` of any of the symbol or command in the string. In addition
+add the unicode char corresponding to the command if known to the `Either`.
+
+Symbol coming from a known command have the form
+    (:symbol, unicode_char, original_command)
+while others have the first field.
+"""
+function any_symbol(s)
+    commands = split(s)
+    chars = [latex_symbols[com] for com in commands if haskey(latex_symbols, com)]
+    
+    append!(commands, chars)
+
+    return Either(to_token.(commands)...) do com
+        if haskey(latex_symbols, com)
+            return (:symbol, latex_symbols[com], com)
+        else
+            return (:symbol, com)
+        end
+    end
+end
+
 # Super and subscript
 superscript = Sequence(2, '^', atom)
 subscript = Sequence(2, '_', atom)
@@ -92,7 +122,7 @@ decorated = Sequence(atom, decoration) do (core, dec)
     (:decorated, core, dec[2], dec[3])
 end
 
-binary_operator = Either(split_tokens(raw"""
+binary_operator = any_symbol(raw"""
     + * -
     \pm             \sqcap                   \rhd
     \mp             \sqcup                   \unlhd
@@ -105,9 +135,9 @@ binary_operator = Either(split_tokens(raw"""
     \cdot           \bigtriangledown         \bigcirc
     \cap            \triangleleft            \dagger
     \cup            \triangleright           \ddagger
-    \uplus          \lhd                     \amalg""")...)
+    \uplus          \lhd                     \amalg""")
 
-relation = Either(split_tokens(raw"""
+relation = any_symbol(raw"""
     = < > :
     \leq        \geq        \equiv   \models
     \prec       \succ       \sim     \perp
@@ -118,9 +148,9 @@ relation = Either(split_tokens(raw"""
     \sqsubset   \sqsupset   \neq     \smile
     \sqsubseteq \sqsupseteq \doteq   \frown
     \in         \ni         \propto  \vdash
-    \dashv      \dots       \dotplus \doteqdot""")...)
+    \dashv      \dots       \dotplus \doteqdot""")
 
-arrow = Either(split_tokens(raw"""
+arrow = any_symbol(raw"""
     \leftarrow              \longleftarrow           \uparrow
     \Leftarrow              \Longleftarrow           \Uparrow
     \rightarrow             \longrightarrow          \downarrow
@@ -131,25 +161,21 @@ arrow = Either(split_tokens(raw"""
     \hookleftarrow          \hookrightarrow          \searrow
     \leftharpoonup          \rightharpoonup          \swarrow
     \leftharpoondown        \rightharpoondown        \nwarrow
-    \rightleftharpoons      \leadsto""")...)
+    \rightleftharpoons      \leadsto""")
 
 spaced_symbol = sEither(binary_operator, relation, arrow) do x
     (:spaced_symbol, x)
 end
 
 # Currently unused
-punctuation = Either(split_tokens(raw", ; . ! \ldotp \cdotp")...) do x
-    (:punctuation, x)
-end
+punctuation = any_symbol(raw", ; . ! \ldotp \cdotp")
 
-overunder_symbol = Either(split_tokens(raw"""
+overunder_symbol = any_symbol(raw"""
     \sum \prod \coprod \bigcap \bigcup \bigsqcup \bigvee
-    \bigwedge \bigodot \bigotimes \bigoplus \biguplus""")...) do sym
-        (:symbol, sym)
-    end
+    \bigwedge \bigodot \bigotimes \bigoplus \biguplus""")
 
 overunder_function = Sequence(
-    2, bslash, Either(split_tokens(raw"lim liminf limsup sup max min")...)) do name
+    2, bslash, any_symbol(raw"lim liminf limsup sup max min")) do name
         (:function, name)
     end
 
@@ -159,9 +185,7 @@ underover = Sequence(
         dec === missing ? core : (:underover, core, dec[2], dec[3])
     end
 
-integral_symbol = Either(split_tokens(raw"\int \oint")...) do sym
-    (:symbol, sym)
-end
+integral_symbol = any_symbol(raw"\int \oint")
 
 integral = Sequence(integral_symbol, Optional(decoration)) do (core, dec)
     dec === missing ? core : (:integral, core, dec[2], dec[3])
@@ -263,7 +287,7 @@ mathfont = Sequence(bslash, "math", Either(fontnames...), group) do (_, _, name,
     (:mathfont, name, content)
 end
 
-frac = Sequence(raw"\frac", group, group) do (_, num, denum)
+frac = Sequence(to_token(raw"\frac"), group, group) do (_, num, denum)
     (:frac, num, denum)
 end
 
@@ -277,6 +301,13 @@ push!(atom, narrow_accent)
 push!(atom, func)
 push!(atom, Numeric(Int))
 
+# Intercept generic latex symbol inserted as unicode
+unicode_math = Either(keys(symbols_latex)...) do char
+    (:symbol, char, symbols_latex[char])
+end
+
+push!(atom, unicode_math)
+
 # Finally anything not matched yet is a single char
 char = CharNotIn(raw"\%_^{}")
 
@@ -285,7 +316,12 @@ push!(atom, char)
 ## Default for generic latex commands
 # We assume anything that starts with \ and has not been catch is a symbol
 symbol = Sequence(2, bslash, Repeat(command_char)) do chars
-    (:symbol, bslash * join(chars))
+    com = bslash * join(chars)
+    if haskey(latex_symbols, com)
+        return (:symbol, latex_symbols[com], com)
+    else
+        return (:symbol, com)
+    end
 end
 
 # Make sure to add it at the very end to avoid matching known commands as a
