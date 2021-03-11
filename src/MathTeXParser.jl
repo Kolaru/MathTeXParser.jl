@@ -21,11 +21,9 @@ function TeXExpr(tuple::Tuple)
     for arg in tuple[2:end]
         if isa(arg, Tuple)
             push!(args, TeXExpr(arg))
-        else
-            # Ignore all spaces, this could probably be done elsewhere
-            if arg != ' '
-                push!(args, arg)
-            end
+        # Ignore all spaces
+        elseif arg != ' '
+            push!(args, arg)
         end
     end
 
@@ -55,7 +53,7 @@ Base.parse(::Type{TeXExpr}, s) = TeXExpr(parse(Sequence(1, mathexpr, AtEnd()), s
 bslash = '\\'
 
 # Definition is forwarded to allow recursive search
-atom = Either{Any}(Numeric(Int), CharNotIn(raw"\%_^{}"))  # Called `placeable` in matplotlib
+atom = Either{Any}()  # Called `placeable` in matplotlib
 
 command_char = CharIn(union('a':'z'), ('A':'Z'))
 
@@ -82,11 +80,11 @@ decoration = Either(
     Sequence(subscript, superscript) do (x, y)
         (:subsuper, x, y)
     end,
-    Sequence(superscript, Optional(subscript, default="")) do (x, y)
+    Sequence(superscript, Optional(subscript, default=nothing)) do (x, y)
         (:subsuper, y, x)
     end,
     Sequence(1, subscript) do x
-        (:subsuper, x, "")
+        (:subsuper, x, nothing)
     end
 )
 
@@ -139,6 +137,7 @@ spaced_symbol = sEither(binary_operator, relation, arrow) do x
     (:spaced_symbol, x)
 end
 
+# Currently unused
 punctuation = Either(split_tokens(raw", ; . ! \ldotp \cdotp")...) do x
     (:punctuation, x)
 end
@@ -199,7 +198,7 @@ end
 
 ## Main parser
 mathexpr = Repeat(Either(
-    integral, underover, decorated, spaced_symbol, punctuation, space, atom)) do res
+    integral, underover, decorated, spaced_symbol, space, atom)) do res
     (:group, res...)
 end
 
@@ -269,14 +268,19 @@ frac = Sequence(raw"\frac", group, group) do (_, num, denum)
 end
 
 # Add everything needed to atom
+push!(atom, delimited)
+push!(atom, group)
+push!(atom, frac)
+push!(atom, mathfont)
+push!(atom, wide_accent)
+push!(atom, narrow_accent)
 push!(atom, func)
-pushfirst!(atom, narrow_accent)
-pushfirst!(atom, wide_accent)
-pushfirst!(atom, mathfont)
-pushfirst!(atom, frac)
-pushfirst!(atom, group)
-pushfirst!(atom, delimited)
+push!(atom, Numeric(Int))
 
+# Finally anything not matched yet is a single char
+char = CharNotIn(raw"\%_^{}")
+
+push!(atom, char)
 
 ## Default for generic latex commands
 # We assume anything that starts with \ and has not been catch is a symbol
