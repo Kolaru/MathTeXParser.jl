@@ -22,21 +22,21 @@ end
 end
 
 @testset "Integral" begin
-    test_parse(raw"\int", (:symbol, "∫", raw"\int"))
+    test_parse(raw"\int", (:symbol, '∫', raw"\int"))
     test_parse(raw"\int_a^b", (:overunder,
-        (:symbol, "∫", raw"\int"), 'a', 'b'))
+        (:symbol, '∫', raw"\int"), 'a', 'b'))
 end
 
 @testset "Overunder" begin
-    test_parse(raw"\sum", (:symbol, "∑", raw"\sum"))
+    test_parse(raw"\sum", (:symbol, '∑', raw"\sum"))
     test_parse(raw"\sum_{k=0}^n", (:overunder,
-        (:symbol, "∑", raw"\sum"),
-        (:group, 'k', (:spaced_symbol, (:symbol, "=")), 0),
+        (:symbol, '∑', raw"\sum"),
+        (:group, 'k', (:spaced_symbol, (:symbol, '=', "")), 0),
         'n'))
 end
 
 @testset "Symbol" begin
     for (char, sym) in zip(split("ϕ φ Φ"), split(raw"\phi \varphi \Phi"))
-        test_parse(sym, (:symbol, char, sym))
+        test_parse(sym, (:symbol, first(char), sym))
     end
 end

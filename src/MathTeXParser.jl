@@ -5,10 +5,7 @@ module MathTeXParser
 using AbstractTrees
 using CombinedParsers
 import REPL.REPLCompletions: latex_symbols
-import REPL: symbols_latex, symbol_latex
-
-# Force REPLCompletions to populate symbols_latex
-symbol_latex("")
+import REPL: symbol_latex
 
 export TeXExpr, parse
 
@@ -93,10 +90,16 @@ function any_symbol(s)
     append!(commands, chars)
 
     return Either(to_token.(commands)...) do com
+        com = convert(String, com)
         if haskey(latex_symbols, com)
-            return (:symbol, latex_symbols[com], com)
+            # In tis case the second argument should be a Char
+            return (:symbol, first(latex_symbols[com]), com)
         else
-            return (:symbol, com)
+            if length(com) == 1
+                return (:symbol, first(com), symbol_latex(com))
+            else
+                return (:symbol, '?', com)
+            end
         end
     end
 end
@@ -170,17 +173,17 @@ end
 # Currently unused
 punctuation = any_symbol(raw", ; . ! \ldotp \cdotp")
 
-overunder_symbol = any_symbol(raw"""
+underover_symbol = any_symbol(raw"""
     \sum \prod \coprod \bigcap \bigcup \bigsqcup \bigvee
     \bigwedge \bigodot \bigotimes \bigoplus \biguplus""")
 
-overunder_function = Sequence(
-    2, bslash, any_symbol(raw"lim liminf limsup sup max min")) do name
+underover_function = Sequence(
+    2, bslash, Either(split_tokens(raw"lim liminf limsup inf sup min max")...)) do name
         (:function, name)
     end
 
 underover = Sequence(
-    sEither(overunder_symbol, overunder_function),
+    sEither(underover_symbol, underover_function),
     Optional(decoration)) do (core, dec)
         dec === missing ? core : (:underover, core, dec[2], dec[3])
     end
@@ -191,12 +194,11 @@ integral = Sequence(integral_symbol, Optional(decoration)) do (core, dec)
     dec === missing ? core : (:integral, core, dec[2], dec[3])
 end
 
-# TODO Why are some function both here and in underover ?
 func = Sequence(
     2, bslash, Either(split_tokens(raw"""
-    arccos csc ker min arcsin deg lg Pr arctan det lim sec arg dim
-    liminf sin cos exp limsup sinh cosh gcd ln sup cot hom log tan
-    coth inf max tanh""")...)) do name
+    arccos csc ker arcsin deg lg Pr arctan det sec arg dim
+    sin cos exp sinh cosh gcd ln sup cot hom log tan
+    coth tanh""")...)) do name
         (:function, name)
     end
 
@@ -223,7 +225,7 @@ end
 ## Main parser
 mathexpr = Repeat(Either(
     integral, underover, decorated, spaced_symbol, space, atom)) do res
-    (:group, res...)
+        (:group, res...)
 end
 
 
@@ -302,8 +304,9 @@ push!(atom, func)
 push!(atom, Numeric(Int))
 
 # Intercept generic latex symbol inserted as unicode
-unicode_math = Either(keys(symbols_latex)...) do char
-    (:symbol, char, symbols_latex[char])
+unicode_math = Either(values(latex_symbols)...) do sym
+    sym = convert(String, sym)
+    (:symbol, first(sym), symbol_latex(sym))
 end
 
 push!(atom, unicode_math)
@@ -318,9 +321,9 @@ push!(atom, char)
 symbol = Sequence(2, bslash, Repeat(command_char)) do chars
     com = bslash * join(chars)
     if haskey(latex_symbols, com)
-        return (:symbol, latex_symbols[com], com)
+        return (:symbol, first(latex_symbols[com]), com)
     else
-        return (:symbol, com)
+        return (:symbol, '?', com)
     end
 end
 
