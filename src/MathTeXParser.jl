@@ -73,6 +73,20 @@ end
 
 split_tokens(s) = to_token.(split(s))
 
+function to_symbol(com)
+    com = convert(String, com)
+    if haskey(latex_symbols, com)
+        # In tis case the second argument should be a Char
+        return (:symbol, first(latex_symbols[com]), com)
+    else
+        if length(com) == 1
+            return (:symbol, first(com), symbol_latex(com))
+        else
+            return (:symbol, '?', com)
+        end
+    end
+end
+
 """
     any_symbol(s::String)
 
@@ -89,19 +103,7 @@ function any_symbol(s)
     
     append!(commands, chars)
 
-    return Either(to_token.(commands)...) do com
-        com = convert(String, com)
-        if haskey(latex_symbols, com)
-            # In tis case the second argument should be a Char
-            return (:symbol, first(latex_symbols[com]), com)
-        else
-            if length(com) == 1
-                return (:symbol, first(com), symbol_latex(com))
-            else
-                return (:symbol, '?', com)
-            end
-        end
-    end
+    return Either(to_symbol, to_token.(commands)...)
 end
 
 # Super and subscript
@@ -242,6 +244,8 @@ group = Sequence(2, '{', mathexpr, '}') do expr
 end
 
 # Autodelim
+# TODO find why delimiters take so long to be parsed
+# Mayeb because delimiter appears twice in the sequence ?
 ambi_delimiter = Either(split(raw"""
     | \| / \backslash \uparrow \downarrow \updownarrow \Uparrow
     \Downarrow \Updownarrow . \vert \Vert \\|""")...)
@@ -252,7 +256,11 @@ right_delimiter = Either(split(raw") ] \} > \rfloor \rangle \rceil")...)
 
 delimiter = sEither(ambi_delimiter, left_delimiter, right_delimiter)
 delimited = Sequence(raw"\left", delimiter, mathexpr, raw"\right", delimiter) do res
-    (:delimited, res[2], res[3], res[5])
+    left = to_symbol(res[2])
+    right = to_symbol(res[5])
+    content = res[3]
+
+    (:delimited, left, content, right)
 end
 
 ## Commands using a braced group as an argument
