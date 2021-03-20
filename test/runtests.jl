@@ -35,6 +35,10 @@ end
         'n'))
 end
 
+@testset "Square root" begin
+    test_parse(raw"\sqrt{x}", (:sqrt, 'x'))
+end
+
 @testset "Symbol" begin
     for (char, sym) in zip(split("ϕ φ Φ"), split(raw"\phi \varphi \Phi"))
         test_parse(sym, (:symbol, first(char), sym))

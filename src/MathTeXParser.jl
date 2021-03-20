@@ -301,10 +301,15 @@ frac = Sequence(to_token(raw"\frac"), group, group) do (_, num, denum)
     (:frac, num, denum)
 end
 
+sqrt = Sequence(2, to_token(raw"\sqrt"), group) do content
+    (:sqrt, content)
+end
+
 # Add everything needed to atom
 push!(atom, delimited)
 push!(atom, group)
 push!(atom, frac)
+push!(atom, sqrt)
 push!(atom, mathfont)
 push!(atom, wide_accent)
 push!(atom, narrow_accent)
