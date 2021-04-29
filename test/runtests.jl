@@ -1,15 +1,17 @@
 using Test
 using MathTeXParser
 
-test_parse(input, args...) = @test parse(TeXExpr, input) == TeXExpr((:group, args...))
+import MathTeXParser.manual_texexpr
+
+test_parse(input, args...) = @test texparse(input) == manual_texexpr((:group, args...))
 
 @testset "Accent" begin
-    test_parse(raw"\vec{a}", (:accent, raw"\vec", 'a'))
-    test_parse(raw"\dot{\vec{x}}", (:accent, raw"\dot", (:accent, raw"\vec", 'x')))
+    # test_parse(raw"\vec{a}", (:accent, raw"\vec", 'a'))
+    # test_parse(raw"\dot{\vec{x}}", (:accent, raw"\dot", (:accent, raw"\vec", 'x')))
 end
 
 @testset "Decoration" begin
-    @test parse(TeXExpr, raw"a^2_3") == parse(TeXExpr, "a_3^2")
+    @test texparse(raw"a^2_3") == texparse("a_3^2")
 end
 
 @testset "Command match full words" begin
@@ -18,20 +20,20 @@ end
 end
 
 @testset "Fraction" begin
-    test_parse(raw"\frac{1}{2}", (:frac, 1, 2))
+    test_parse(raw"\frac{1}{2}", (:frac, '1', '2'))
 end
 
 @testset "Integral" begin
-    test_parse(raw"\int", (:symbol, '∫', raw"\int"))
+    test_parse(raw"\int", (:integral, (:symbol, '∫', raw"\int"), nothing, nothing))
     test_parse(raw"\int_a^b", (:overunder,
         (:symbol, '∫', raw"\int"), 'a', 'b'))
 end
 
 @testset "Overunder" begin
-    test_parse(raw"\sum", (:symbol, '∑', raw"\sum"))
-    test_parse(raw"\sum_{k=0}^n", (:overunder,
+    test_parse(raw"\sum", (:underover, (:symbol, '∑', raw"\sum"), nothing, nothing))
+    test_parse(raw"\sum_{k=0}^n", (:underover,
         (:symbol, '∑', raw"\sum"),
-        (:group, 'k', (:spaced_symbol, (:symbol, '=', "")), 0),
+        (:group, 'k', (:spaced, (:symbol, '=', "=")), '0'),
         'n'))
 end
 

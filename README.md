@@ -22,7 +22,7 @@ This works is based on `mathtext`, matplotlib LaTeX engine.
 - `(:accent, symbol, core)` and `(:wide_accent, symbol, core)` Narrow and wide accents
 - `(:mathfont, fontstyle, content)` Mathematical font commands (`\mathbb` and the like). `fontstyle` omits the starting `\math` (e.g. it is `bb` for a `\mathbb` command).
 - `(:frac, numerator, denumerator)` Fraction
-- `(:symbol, symbol_command)` Generic symbol (currently any command not recognized as one of the above fallback to this)
+- `(:symbol, symbol_char, symbol_command)` Generic symbol
 
 # Example
 
