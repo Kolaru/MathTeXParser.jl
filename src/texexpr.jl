@@ -27,7 +27,7 @@ head(::Char) = :char
 Base.copy(texexpr::TeXExpr) = TeXExpr(texexpr.head, deepcopy(texexpr.args))
 
 AbstractTrees.children(texexpr::TeXExpr) = texexpr.args
-AbstractTrees.printnode(io::IO, texexpr::TeXExpr) = print(io, "TeXExpr $(texexpr.head)")
+AbstractTrees.printnode(io::IO, texexpr::TeXExpr) = print(io, "TeXExpr :$(texexpr.head)")
 
 function Base.show(io::IO, texexpr::TeXExpr)
     print_tree(io, texexpr, maxdepth=10)

@@ -44,5 +44,9 @@ end
 @testset "Symbol" begin
     for (char, sym) in zip(split("ϕ φ Φ"), split(raw"\phi \varphi \Phi"))
         test_parse(sym, (:symbol, first(char), sym))
+        @test texparse(char) == texparse(sym)
     end
+
+    # Check interaction with decoration
+    test_parse(raw"ω_k", (:decorated, (:symbol, 'ω', "\\omega"), 'k', nothing))
 end

@@ -1,21 +1,43 @@
 struct TeXParseError <: Exception
     msg::String
     stack::Stack
-    pointer::Int
+    position::Int
     data
 end
 
 function Base.showerror(io::IO, e::TeXParseError)
-    println(io, e.msg)
-    println(io, e.data)
-    print(io, " " ^ e.pointer)
-    println(io, "^")
-    println(io, "Current parsing stack (length $(length(e.stack))):")
+    println(io, "TeXParseError: ",  e.msg)
+    show_state(io, e.stack, e.position, e.data)
+end
 
-    for level in e.stack
-        println(level)
+function show_state(io::IO, stack, position, data)
+
+    if position > lastindex(data)
+        println(io, "after the end of the data")
+        println(io, data)
+    else
+        # Compute the index of the char from the byte index
+        position_to_id = zeros(Int, lastindex(data))
+        id = 0
+        for p in 1:lastindex(data)
+            if isvalid(data, p)
+                id += 1
+            end
+            position_to_id[p] = id
+        end
+        p = position_to_id[position]
+        println(io, "at position ", position, " (string index ", p, ")")
+        println(io, data)
+        println(io, " " ^ (p - 1), "^")
+    end
+
+    println(io, "with stack (length $(length(stack))):")
+    for (k, level) in enumerate(stack)
+        println(io, "[$k] ", level)
     end
 end
+
+show_state(stack, position, data) = show_state(stdout, stack, position, data)
 
 # Super and subscript
 super = re"\^"
@@ -46,8 +68,7 @@ other_char.actions[:enter] = [:end_command_builder]
 other_char.actions[:exit] = [:push_char, :end_token]
 
 mathexpr = re.rep(special_char | other_char)
-# TODO better debug
-# mathexpr.actions[:all] = [:show_debug_info]
+mathexpr.actions[:all] = [:show_debug_info]
 mathexpr.actions[:exit] = [:end_command_builder]
 
 machine = Automa.compile(mathexpr)
@@ -94,16 +115,27 @@ function end_token!(stack)
             TeXParseError("multiple subscripts or superscripts", stack, p, data))
         decorated.args[id] = first(token.args)
         push_to_current!(stack, decorated)
-    elseif head(core) == :right_delimiter
+    elseif head(token) == :left_delimiter
+        push_to_current!(stack, token)
+    elseif head(token) == :right_delimiter
         push_to_current!(stack, token)
         delimited = pop!(stack)
-        push_to_current!(stack, delimited)
+
+        # Simplify by constructing a single :delimited expr
+        left = delimited.args[1]
+        right = delimited.args[end]
+        content = TeXExpr(:group, delimited.args[2:end-1])
+        simplified = TeXExpr(:delimited, [left.args[1], content, right.args[1]])
+        push_to_current!(stack, simplified)
     end
 end
 
 actions = Dict(
     :show_debug_info => quote
-        @show stack
+        if showdebug
+            @info "New transition"
+            show_state(stack, p, data)
+        end
     end,
     :begin_group => quote
         push!(stack, TeXExpr(:group))
@@ -130,11 +162,15 @@ actions = Dict(
         end
     end,
     :push_char => quote
-        char = collected_data[p-1]
-        push_to_current!(stack, get_symbol_expr(char))
+        if isvalid(data, p-1)
+            char = data[prevind(data, p)]
+            push_to_current!(stack, get_symbol_expr(char))
+        end
     end,
     :end_token => quote
-        end_token!(stack)
+        if isvalid(data, p-1)
+            end_token!(stack)
+        end
     end,
     :begin_sub => quote
         push!(stack, TeXExpr(:subscript))
@@ -167,7 +203,7 @@ actions = Dict(
                 push!(stack, TeXExpr(:left_delimiter))
             elseif command_name == "right"
                 current_head(stack) != :delimited && throw(
-                    TeXParseError("Unexpected '\\right' at position $(p-1)",
+                    TeXParseError("unexpected '\\right' at position $(p-1)",
                     stack, p, data))
                 push!(stack, TeXExpr(:right_delimiter))
             elseif is_supported_command(command_name)
@@ -183,19 +219,24 @@ actions = Dict(
 )
 
 context = Automa.CodeGenContext()
-@eval function texparse(data)
+@eval function texparse(data ; showdebug=false)
     $(Automa.generate_init_code(context, machine))
     p_end = p_eof = lastindex(data)
 
     # Needed to avoid problem with multi bytes unicode chars
-    collected_data = collect(data)
     stack = Stack{Any}()
     push!(stack, TeXExpr(:expr))
 
     try
         $(Automa.generate_exec_code(context, machine, actions))
     catch
-        throw(TeXParseError("unexpected error while parsing", stack, p, data))
+        # Workaround for vscode not showing the source error
+        println("unexpected error while parsing")
+        show_state(stderr, stack, p, data)
+        println("original error:")
+        rethrow()
+
+        rethrow(TeXParseError("unexpected error while parsing", stack, p, data))
     end
 
     if length(stack) > 1
@@ -207,5 +248,3 @@ context = Automa.CodeGenContext()
 
     return current(stack)
 end
-
-
