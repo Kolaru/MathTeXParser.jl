@@ -1,3 +1,7 @@
+# Archived
+
+This repo have been merged with https://github.com/Kolaru/MathTeXEngine.jl for convenience.
+
 # MathTeXParser
 
 This package tries to provide parsing for LaTeX math expression, with the end goal to allow plotting package (especially `CairoMakie.jl`) to render mathematical formulas.
